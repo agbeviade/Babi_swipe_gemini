@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "BABI SWIPE IMMO",
+  "short_name": "BabiSwipe",
+  "description": "Trouve ton chez-toi autour de toi. Plateforme immobilière mobile-first ivoirienne inspirée du swipe avec géolocalisation et calcul du coût réel d'entrée.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1115",
+  "theme_color": "#0F1115",
+  "lang": "fr",
+  "categories": ["lifestyle", "real-estate", "shopping"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
