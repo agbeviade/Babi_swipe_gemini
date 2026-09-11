@@ -118,12 +118,17 @@ create policy agencies_manage on agencies
 
 create policy agency_members_read on agency_members
   for select using (user_id = auth.uid() or is_agency_member(agency_id) or is_staff());
+-- Un propriétaire d'agence gère son équipe mais n'attribue aucun rôle plateforme :
+-- 'moderator' et 'admin' restent hors de sa portée.
 create policy agency_members_manage on agency_members
   for all using (
     is_staff() or exists (select 1 from agencies a where a.id = agency_id and a.owner_id = auth.uid())
   )
   with check (
-    is_staff() or exists (select 1 from agencies a where a.id = agency_id and a.owner_id = auth.uid())
+    is_staff() or (
+      exists (select 1 from agencies a where a.id = agency_id and a.owner_id = auth.uid())
+      and role in ('agent', 'agency_admin')
+    )
   );
 
 -- Fiche annonceur publique : ne contient aucune donnée personnelle sensible
@@ -164,6 +169,28 @@ create policy properties_update_own on properties
 create policy properties_staff on properties
   for all using (is_staff()) with check (is_staff());
 
+-- `with check` ne voit pas l'ancienne ligne : un trigger garde le rattachement
+-- de l'annonce à son annonceur et à son agence.
+create or replace function forbid_listing_ownership_transfer()
+returns trigger
+language plpgsql
+as $$
+begin
+  if is_staff() then
+    return new;
+  end if;
+  if new.advertiser_id is distinct from old.advertiser_id
+     or new.agency_id is distinct from old.agency_id then
+    raise exception 'Le rattachement d''une annonce ne peut pas être modifié.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger properties_no_ownership_transfer
+  before update on properties
+  for each row execute function forbid_listing_ownership_transfer();
+
 create policy property_images_read on property_images
   for select using (
     exists (select 1 from properties p where p.id = property_id and p.status = 'published')
@@ -196,9 +223,14 @@ create policy visits_read on visits
   );
 create policy visits_insert on visits
   for insert with check (visitor_id = auth.uid() and status = 'requested');
+-- Un visiteur peut seulement annuler : constater la visite (`completed`) relève
+-- de l'annonceur, sinon un avis "visite vérifiée" pourrait être auto-attribué.
 create policy visits_update on visits
   for update using (visitor_id = auth.uid() or owns_property(property_id) or is_staff())
-  with check (visitor_id = auth.uid() or owns_property(property_id) or is_staff());
+  with check (
+    owns_property(property_id) or is_staff()
+    or (visitor_id = auth.uid() and status in ('requested', 'confirmed', 'cancelled'))
+  );
 
 create policy reviews_read on reviews
   for select using (is_published or author_id = auth.uid() or is_staff());

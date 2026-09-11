@@ -24,13 +24,17 @@ export async function requestOtpAction(
   _prev: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
-  if (!isSupabaseConfigured()) {
-    return { step: 'phone', error: "L'authentification n'est pas encore configurée." };
-  }
-
   const parsed = requestOtpSchema.safeParse({ phone: formData.get('phone') });
   if (!parsed.success) {
     return { step: 'phone', error: parsed.error.issues[0]?.message ?? 'Numéro invalide' };
+  }
+
+  if (!isSupabaseConfigured()) {
+    return {
+      step: 'phone',
+      phone: parsed.data.phone,
+      error: "L'authentification n'est pas encore configurée.",
+    };
   }
 
   const limit = rateLimit(await clientKey(`otp-request:${parsed.data.phone}`), 3, 15 * 60 * 1000);
@@ -59,10 +63,6 @@ export async function verifyOtpAction(
   _prev: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
-  if (!isSupabaseConfigured()) {
-    return { step: 'phone', error: "L'authentification n'est pas encore configurée." };
-  }
-
   const parsed = verifyOtpSchema.safeParse({
     phone: formData.get('phone'),
     token: formData.get('token'),
@@ -73,6 +73,14 @@ export async function verifyOtpAction(
       step: 'otp',
       phone: String(formData.get('phone') ?? ''),
       error: parsed.error.issues[0]?.message ?? 'Code invalide',
+    };
+  }
+
+  if (!isSupabaseConfigured()) {
+    return {
+      step: 'otp',
+      phone: parsed.data.phone,
+      error: "L'authentification n'est pas encore configurée.",
     };
   }
 

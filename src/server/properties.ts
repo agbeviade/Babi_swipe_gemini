@@ -13,9 +13,17 @@ const PROPERTY_SELECT = `
   city:cities ( name ),
   commune:communes ( name ),
   neighborhood:neighborhoods ( name ),
-  advertiser:advertisers ( id, display_name, type, phone, whatsapp, agency:agencies ( name ) ),
+  advertiser:advertisers ( id, user_id, display_name, type, phone, whatsapp, agency:agencies ( name ) ),
   images:property_images ( id, storage_path, position, is_primary, caption )
 `;
+
+const VERIFICATION_LEVEL_BY_KIND: Record<string, VerificationLevel | undefined> = {
+  phone: 'phone_verified',
+  identity: 'id_verified',
+  owner: 'owner_verified',
+  agency: 'agency_verified',
+  listing: 'listing_verified',
+};
 
 interface NamedRow {
   name: string | null;
@@ -31,6 +39,7 @@ interface ImageRow {
 
 interface AdvertiserRow {
   id: string;
+  user_id: string;
   display_name: string;
   type: 'particulier' | 'agence';
   phone: string;
@@ -75,19 +84,28 @@ function toNumber(value: number | string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function publicImageUrl(storagePath: string): string {
-  if (/^https?:\/\//.test(storagePath)) return storagePath;
+/**
+ * Les images ne peuvent venir que du bucket `property-images` : un chemin absolu
+ * stocké en base ne doit jamais faire sortir l'application du stockage Supabase.
+ */
+function publicImageUrl(storagePath: string): string | null {
+  const normalized = storagePath.replace(/^\/+/, '');
+  if (normalized === '' || normalized.includes('..') || /^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+    return null;
+  }
   const { url } = requireSupabasePublicEnv();
-  return `${url}/storage/v1/object/public/property-images/${storagePath}`;
+  return `${url}/storage/v1/object/public/property-images/${normalized}`;
 }
 
-function mapProperty(row: PropertyRow, verifiedIds: Set<string>): Property {
+function mapProperty(
+  row: PropertyRow,
+  verifiedIds: Set<string>,
+  advertiserVerifications: Map<string, VerificationLevel[]>,
+): Property {
   const price = toNumber(row.price) ?? 0;
   const images = [...(row.images ?? [])].sort(
     (a, b) => Number(b.is_primary) - Number(a.is_primary) || (a.position ?? 0) - (b.position ?? 0),
   );
-
-  const advertiserVerifications: VerificationLevel[] = [];
 
   return {
     id: row.id,
@@ -107,13 +125,20 @@ function mapProperty(row: PropertyRow, verifiedIds: Set<string>): Property {
     bathrooms: row.bathrooms,
     areaSqm: toNumber(row.area_sqm) ?? 0,
     features: row.features ?? [],
-    images: images.map((image, index) => ({
-      id: image.id,
-      url: publicImageUrl(image.storage_path),
-      isMain: index === 0,
-      isPrimary: Boolean(image.is_primary),
-      caption: image.caption ?? undefined,
-    })),
+    images: images.flatMap((image, index) => {
+      const url = publicImageUrl(image.storage_path);
+      return url === null
+        ? []
+        : [
+            {
+              id: image.id,
+              url,
+              isMain: index === 0,
+              isPrimary: Boolean(image.is_primary),
+              caption: image.caption ?? undefined,
+            },
+          ];
+    }),
     advertiser: {
       id: row.advertiser?.id ?? '',
       name: row.advertiser?.display_name ?? '',
@@ -121,9 +146,9 @@ function mapProperty(row: PropertyRow, verifiedIds: Set<string>): Property {
       agencyName: row.advertiser?.agency?.name ?? undefined,
       phone: row.advertiser?.phone ?? '',
       whatsapp: row.advertiser?.whatsapp ?? '',
-      // Les vérifications annonceur sont résolues par la modération, pas déduites ici.
-      verifications: advertiserVerifications,
-      isVerified: false,
+      // Vérifications actives accordées par la modération, jamais déclarées par l'annonceur.
+      verifications: advertiserVerifications.get(row.advertiser?.id ?? '') ?? [],
+      isVerified: (advertiserVerifications.get(row.advertiser?.id ?? '') ?? []).length > 0,
     },
     entryCost: buildEntryCost({
       loyer: price,
@@ -164,21 +189,57 @@ export async function getPublishedProperties(limit = 60): Promise<Property[]> {
   const rows = (data ?? []) as unknown as PropertyRow[];
   if (rows.length === 0) return [];
 
-  const { data: verifications } = await supabase
-    .from('verifications')
-    .select('subject_property_id')
-    .eq('kind', 'listing')
-    .eq('status', 'verified')
-    .in(
-      'subject_property_id',
-      rows.map((row) => row.id),
-    );
+  const nowIso = new Date().toISOString();
+  const advertiserUserIds = [
+    ...new Set(rows.map((row) => row.advertiser?.user_id).filter((id): id is string => Boolean(id))),
+  ];
+
+  // Une vérification expirée ne vaut plus badge : `valid_until` est toujours appliqué.
+  const [listingVerifications, userVerifications] = await Promise.all([
+    supabase
+      .from('verifications')
+      .select('subject_property_id')
+      .eq('kind', 'listing')
+      .eq('status', 'verified')
+      .or(`valid_until.is.null,valid_until.gt.${nowIso}`)
+      .in(
+        'subject_property_id',
+        rows.map((row) => row.id),
+      ),
+    advertiserUserIds.length > 0
+      ? supabase
+          .from('verifications')
+          .select('subject_user_id, kind')
+          .eq('status', 'verified')
+          .or(`valid_until.is.null,valid_until.gt.${nowIso}`)
+          .in('subject_user_id', advertiserUserIds)
+      : Promise.resolve({ data: [] as { subject_user_id: string | null; kind: string }[] }),
+  ]);
 
   const verifiedIds = new Set(
-    ((verifications ?? []) as { subject_property_id: string | null }[])
+    ((listingVerifications.data ?? []) as { subject_property_id: string | null }[])
       .map((row) => row.subject_property_id)
       .filter((id): id is string => id !== null),
   );
 
-  return rows.map((row) => mapProperty(row, verifiedIds));
+  const levelsByUser = new Map<string, VerificationLevel[]>();
+  for (const row of (userVerifications.data ?? []) as {
+    subject_user_id: string | null;
+    kind: string;
+  }[]) {
+    const level = VERIFICATION_LEVEL_BY_KIND[row.kind];
+    if (!row.subject_user_id || !level) continue;
+    const levels = levelsByUser.get(row.subject_user_id) ?? [];
+    if (!levels.includes(level)) levels.push(level);
+    levelsByUser.set(row.subject_user_id, levels);
+  }
+
+  const levelsByAdvertiser = new Map<string, VerificationLevel[]>();
+  for (const row of rows) {
+    const advertiser = row.advertiser;
+    if (!advertiser) continue;
+    levelsByAdvertiser.set(advertiser.id, levelsByUser.get(advertiser.user_id) ?? []);
+  }
+
+  return rows.map((row) => mapProperty(row, verifiedIds, levelsByAdvertiser));
 }

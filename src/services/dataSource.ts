@@ -22,6 +22,8 @@ import { isSupabaseConfigured } from '@/lib/env';
  */
 export interface AppDataSource {
   getProperties(): Promise<Property[]>;
+  /** Faux tant qu'aucune mutation serveur n'existe : l'UI masque alors ces actions. */
+  canMutateProperties(): boolean;
   addProperty(property: Property): void;
   updateProperty(id: string, updates: Partial<Property>): void;
   deleteProperty(id: string): void;
@@ -59,9 +61,22 @@ const localDataSource: AppDataSource = {
   // Hors développement, aucune annonce de démonstration n'est servie :
   // la liste reste vide tant que la lecture Supabase (phase 4) n'est pas branchée.
   getProperties: async () => (mocksAllowed() ? localStore.getProperties() : []),
-  addProperty: (property) => localStore.addProperty(property),
-  updateProperty: (id, updates) => localStore.updateProperty(id, updates),
-  deleteProperty: (id) => localStore.deleteProperty(id),
+  // Les mutations d'annonces n'ont pas encore d'\u00e9quivalent serveur : hors
+  // d\u00e9veloppement elles sont refus\u00e9es plut\u00f4t que d'\u00e9crire dans le navigateur,
+  // ce qui laisserait l'utilisateur croire \u00e0 une modification persist\u00e9e.
+  canMutateProperties: () => mocksAllowed(),
+  addProperty: (property) => {
+    if (!mocksAllowed()) return;
+    localStore.addProperty(property);
+  },
+  updateProperty: (id, updates) => {
+    if (!mocksAllowed()) return;
+    localStore.updateProperty(id, updates);
+  },
+  deleteProperty: (id) => {
+    if (!mocksAllowed()) return;
+    localStore.deleteProperty(id);
+  },
 
   getPreferences: () => localStore.getPreferences(),
   savePreferences: (prefs) => localStore.savePreferences(prefs),

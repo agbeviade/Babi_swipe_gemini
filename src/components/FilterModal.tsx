@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { UserPreferences, PropertyType, PropertySortBy, TransactionType } from '@/types';
 import { ABIDJAN_COMMUNES, PROPERTY_FEATURES_LIST } from '@/lib/constants';
@@ -37,6 +37,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(preferences.features);
   const [onlyVerified, setOnlyVerified] = useState<boolean>(preferences.onlyVerified || false);
   const [sortBy, setSortBy] = useState<PropertySortBy>(preferences.sortBy || 'score');
+
+  // Le modal reste monté : à chaque ouverture le brouillon repart des préférences
+  // courantes, sinon "Appliquer" réécrirait des critères obsolètes.
+  useEffect(() => {
+    if (!isOpen) return;
+    setTransaction(preferences.transaction);
+    setSelectedTypes(preferences.propertyTypes);
+    setSelectedCommunes(preferences.communes);
+    setBudgetMax(preferences.budgetMax || 350000);
+    setSelectedFeatures(preferences.features);
+    setOnlyVerified(preferences.onlyVerified || false);
+    setSortBy(preferences.sortBy || 'score');
+  }, [isOpen, preferences]);
 
   if (!isOpen) return null;
 

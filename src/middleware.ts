@@ -4,10 +4,23 @@ import { isSupabaseConfigured, publicEnv } from '@/lib/env';
 
 const PROTECTED_PREFIXES = ['/compte', '/pro', '/admin'];
 
+function loginRedirect(request: NextRequest) {
+  const loginUrl = new URL('/connexion', request.url);
+  loginUrl.searchParams.set('next', request.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
+}
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request });
 
-  if (!isSupabaseConfigured()) return response;
+  const needsAuth = PROTECTED_PREFIXES.some((prefix) =>
+    request.nextUrl.pathname.startsWith(prefix),
+  );
+
+  // Sans Supabase, aucune session ne peut exister : les zones protégées restent fermées.
+  if (!isSupabaseConfigured()) {
+    return needsAuth ? loginRedirect(request) : response;
+  }
 
   const supabase = createServerClient(
     publicEnv.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,14 +43,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const needsAuth = PROTECTED_PREFIXES.some((prefix) =>
-    request.nextUrl.pathname.startsWith(prefix),
-  );
-
   if (needsAuth && !user) {
-    const loginUrl = new URL('/connexion', request.url);
-    loginUrl.searchParams.set('next', request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return loginRedirect(request);
   }
 
   return response;

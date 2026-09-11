@@ -14,8 +14,16 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { MobileMoneyOperator, PaymentOrder } from '@/types';
-import { COIN_PACKAGES, processMobileMoneyPayment } from '@/services/paymentService';
+import { COIN_PACKAGES } from '@/services/paymentService';
 import { formatFCFA } from '@/services/budgetService';
+
+/**
+ * Le paiement exige une commande créée côté serveur, un webhook signé et un
+ * ledger de coins (phase 9). Tant qu'ils n'existent pas, aucun encaissement
+ * n'est proposé : afficher un succès simulé annoncerait une transaction
+ * financière qui n'a jamais eu lieu.
+ */
+const CHECKOUT_ENABLED = false;
 
 interface CoinsModalProps {
   isOpen: boolean;
@@ -30,50 +38,16 @@ export const CoinsModal: React.FC<CoinsModalProps> = ({
   isOpen,
   onClose,
   currentBalance,
-  onPurchaseComplete,
   onActivatePriorityPass,
   isPriorityActive
 }) => {
   const [selectedPackId, setSelectedPackId] = useState<string>('pro');
   const [selectedOperator, setSelectedOperator] = useState<MobileMoneyOperator>('wave');
   const [phoneNumber, setPhoneNumber] = useState<string>('0707123456');
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const selectedPack = COIN_PACKAGES.find((p) => p.id === selectedPackId) || COIN_PACKAGES[1];
-
-  const handlePay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setIsProcessing(true);
-
-    try {
-      const order = await processMobileMoneyPayment({
-        operator: selectedOperator,
-        phoneNumber,
-        amountFCFA: selectedPack.priceFCFA,
-        description: `Achat Pack ${selectedPack.name} - ${selectedPack.coins} Babi Coins`
-      });
-
-      if (order.status === 'success') {
-        setPaymentSuccess(true);
-        onPurchaseComplete(selectedPack.coins, order);
-        setTimeout(() => {
-          setPaymentSuccess(false);
-          onClose();
-        }, 2200);
-      } else {
-        setErrorMessage(order.errorMessage || 'Paiement non finalisé');
-      }
-    } catch {
-      setErrorMessage('Erreur de communication avec la passerelle de paiement.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const operators: { id: MobileMoneyOperator; name: string; color: string; bg: string }[] = [
     { id: 'wave', name: 'Wave (Sans frais)', color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/40 text-sky-300' },
@@ -117,18 +91,7 @@ export const CoinsModal: React.FC<CoinsModalProps> = ({
 
         {/* Modal Content */}
         <div className="p-5 overflow-y-auto max-h-[75vh] space-y-5 text-xs">
-          {paymentSuccess ? (
-            <div className="py-8 text-center space-y-3">
-              <CheckCircle2 className="w-14 h-14 text-[#4CAF50] mx-auto animate-bounce" />
-              <h3 className="text-lg font-bold text-white">
-                Paiement Mobile Money réussi !
-              </h3>
-              <p className="text-xs text-gray-400">
-                +{selectedPack.coins} Babi Coins ont été crédités sur votre compte.
-              </p>
-            </div>
-          ) : (
-            <>
+          <>
               {/* Feature Perks Unlockable with Coins */}
               <div className="p-3.5 rounded-2xl bg-[#0F1115] border border-white/10 space-y-2">
                 <span className="font-bold text-[11px] text-gray-400 uppercase tracking-wider block">
@@ -222,7 +185,7 @@ export const CoinsModal: React.FC<CoinsModalProps> = ({
               </div>
 
               {/* Phone number for Push validation */}
-              <form onSubmit={handlePay} className="space-y-3 pt-1">
+              <div className="space-y-3 pt-1">
                 <div>
                   <label className="font-semibold block mb-1 text-gray-300">
                     Numéro de débit Mobile Money (+225)
@@ -243,28 +206,24 @@ export const CoinsModal: React.FC<CoinsModalProps> = ({
                   </span>
                 </div>
 
-                {errorMessage && (
-                  <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-1.5">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Le paiement Mobile Money n'est pas encore ouvert : aucun débit ni crédit de
+                    Coins n'est possible tant que la passerelle n'est pas raccordée.
+                  </span>
+                </div>
 
                 <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="w-full py-3.5 rounded-2xl bg-[#FF5A2D] hover:bg-[#FF5A2D]/90 text-white font-black text-xs shadow-[0_0_20px_rgba(255,90,45,0.4)] transition active:scale-98 flex items-center justify-center gap-2"
+                  type="button"
+                  disabled={!CHECKOUT_ENABLED}
+                  className="w-full py-3.5 rounded-2xl bg-[#FF5A2D] hover:bg-[#FF5A2D]/90 text-white font-black text-xs shadow-[0_0_20px_rgba(255,90,45,0.4)] transition active:scale-98 flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed"
                 >
                   <Coins className="w-4 h-4 text-[#FFD700]" />
-                  <span>
-                    {isProcessing
-                      ? 'Paiement en cours...'
-                      : `Payer ${formatFCFA(selectedPack.priceFCFA)} par ${selectedOperator.toUpperCase()}`}
-                  </span>
+                  <span>{`Payer ${formatFCFA(selectedPack.priceFCFA)} par ${selectedOperator.toUpperCase()}`}</span>
                 </button>
-              </form>
+              </div>
             </>
-          )}
         </div>
       </div>
     </div>

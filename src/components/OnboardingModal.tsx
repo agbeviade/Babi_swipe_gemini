@@ -257,14 +257,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <div className="p-3.5 rounded-2xl bg-[#FF5A2D]/10 border border-[#FF5A2D]/30 text-xs space-y-1.5">
                   <div className="flex items-center gap-1.5 font-bold text-[#FF5A2D]">
                     <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
-                    <span>Aperçu Babi Budget d'entrée estimé :</span>
+                    <span>Babi Budget d'entrée :</span>
                   </div>
                   <p className="text-gray-300">
-                    Pour un loyer de {budgetMax.toLocaleString('fr-FR')} FCFA, prévoyez environ{' '}
-                    <strong className="text-white font-bold">
-                      {(budgetMax * 5 + 30000).toLocaleString('fr-FR')} FCFA
-                    </strong>{' '}
-                    (2 mois de caution + 2 mois d'avance + frais d'agence 1 mois + dossier).
+                    Le coût d'entrée dépend de la caution, de l'avance et des frais déclarés par
+                    chaque annonce. Il s'affiche sur la fiche du logement, et reste{' '}
+                    <strong className="text-white font-bold">Non renseigné</strong> tant que
+                    l'annonceur ne les a pas indiqués.
                   </p>
                 </div>
               )}

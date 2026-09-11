@@ -26,7 +26,7 @@ import {
   PaymentOrder
 } from '@/types';
 import { calculateBabiScore } from '@/services/babiScoreService';
-import { getCurrentPosition } from '@/services/geoService';
+import { calculateDistanceKm, getCurrentPosition } from '@/services/geoService';
 import { Bell, X } from 'lucide-react';
 
 const data = getDataSource();
@@ -84,9 +84,19 @@ export default function AppShell({ canAccessAdmin, initialProperties }: AppShell
     setShowOnboarding(data.isFirstVisit());
   }, []);
 
+  // Distance recalculée dès que la position de l'utilisateur change.
+  const locatedProperties = useMemo(() => {
+    const { userLat, userLng } = userPreferences;
+    if (userLat === undefined || userLng === undefined) return properties;
+    return properties.map((p) => ({
+      ...p,
+      distanceKm: calculateDistanceKm(userLat, userLng, p.latitude, p.longitude),
+    }));
+  }, [properties, userPreferences.userLat, userPreferences.userLng]);
+
   // Filter & sort properties based on preferences
   const filteredProperties = useMemo(() => {
-    const result = properties.filter((p) => {
+    const result = locatedProperties.filter((p) => {
       // Exclude already swiped cards in swipe mode
       if (activeTab === 'swipe' && swipedIds.includes(p.id)) {
         return false;
@@ -120,6 +130,20 @@ export default function AppShell({ canAccessAdmin, initialProperties }: AppShell
         return false;
       }
 
+      // Filter bedrooms (critère minimum demandé)
+      if (userPreferences.bedrooms && p.bedrooms < userPreferences.bedrooms) {
+        return false;
+      }
+
+      // Filter features : tous les équipements demandés doivent être présents
+      if (
+        userPreferences.features &&
+        userPreferences.features.length > 0 &&
+        !userPreferences.features.every((feature) => p.features.includes(feature))
+      ) {
+        return false;
+      }
+
       // Filter verified
       if (userPreferences.onlyVerified && p.advertiser.verifications.length < 2) {
         return false;
@@ -145,7 +169,7 @@ export default function AppShell({ canAccessAdmin, initialProperties }: AppShell
     });
 
     return result;
-  }, [properties, swipedIds, userPreferences, activeTab]);
+  }, [locatedProperties, swipedIds, userPreferences, activeTab]);
 
   // Favorites list
   const favoriteProperties = useMemo(() => {
@@ -265,6 +289,13 @@ export default function AppShell({ canAccessAdmin, initialProperties }: AppShell
 
   // Owner listing addition
   const handleAddProperty = (newProp: Property) => {
+    if (!data.canMutateProperties()) {
+      triggerNotification(
+        'Publication indisponible',
+        "La mise en ligne passera par le serveur : rien n'a été enregistré.",
+      );
+      return;
+    }
     data.addProperty(newProp);
     void data.getProperties().then(setProperties);
     triggerNotification('🏡 Annonce en ligne', `${newProp.title} a été diffusée.`);
@@ -285,6 +316,13 @@ export default function AppShell({ canAccessAdmin, initialProperties }: AppShell
   // Admin moderation
   const handleModerateProperty = (propertyId: string, action: 'approve' | 'reject' | 'delete') => {
     if (action === 'delete') {
+      if (!data.canMutateProperties()) {
+        triggerNotification(
+          'Modération indisponible',
+          "La suppression passera par le serveur : l'annonce reste en ligne.",
+        );
+        return;
+      }
       data.deleteProperty(propertyId);
       void data.getProperties().then(setProperties);
       triggerNotification('🛡️ Modération', 'Annonce supprimée de la plateforme.');
