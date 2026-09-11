@@ -23,7 +23,7 @@ import {
 import confetti from 'canvas-confetti';
 import { Property, UserPreferences } from '@/types';
 import { formatDistance } from '@/services/geoService';
-import { formatFCFA } from '@/services/budgetService';
+import { formatFCFA, formatFCFAOrUnknown } from '@/services/budgetService';
 import { calculateBabiScore } from '@/services/babiScoreService';
 
 interface SwipeViewProps {
@@ -330,9 +330,9 @@ export const SwipeView: React.FC<SwipeViewProps> = ({
             {/* Babi Budget snippet (true entry cost) */}
             {topProperty.transaction === 'location' && (
               <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-xs">
-                <span className="text-gray-400 text-[11px]">Coût d'entrée estimé :</span>
+                <span className="text-gray-400 text-[11px]">Coût d'entrée :</span>
                 <span className="font-bold text-[#FF5A2D] bg-[#FF5A2D]/10 px-2 py-0.5 rounded border border-[#FF5A2D]/20">
-                  {formatFCFA(topProperty.entryCost.total)}
+                  {formatFCFAOrUnknown(topProperty.entryCost.total)}
                 </span>
               </div>
             )}

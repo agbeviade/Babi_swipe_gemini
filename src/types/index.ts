@@ -27,13 +27,19 @@ export interface PropertyImage {
   caption?: string;
 }
 
+/**
+ * Coût d'entrée déclaré par l'annonceur.
+ * Un poste inconnu vaut `null` : il s'affiche « Non renseigné » et rend le
+ * total indisponible. Aucun montant n'est extrapolé.
+ */
 export interface EntryCost {
   loyer: number;
-  cautionMois: number;
-  avanceMois: number;
-  fraisAgence: number; // typically 1 month
-  fraisDossier: number;
-  total: number;
+  cautionMois: number | null;
+  avanceMois: number | null;
+  fraisAgence: number | null;
+  fraisDossier: number | null;
+  /** Null dès qu'un poste obligatoire (caution, avance) est inconnu. */
+  total: number | null;
 }
 
 export interface Advertiser {

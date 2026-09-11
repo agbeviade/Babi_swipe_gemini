@@ -24,7 +24,7 @@ import {
   Info
 } from 'lucide-react';
 import { Property, UserPreferences, VisitRequest } from '@/types';
-import { formatFCFA, assessBudgetSuitability } from '@/services/budgetService';
+import { formatFCFA, formatFCFAOrUnknown, assessBudgetSuitability } from '@/services/budgetService';
 import { calculateBabiScore } from '@/services/babiScoreService';
 import { formatDistance } from '@/services/geoService';
 import { PROPERTY_FEATURES_LIST } from '@/lib/constants';
@@ -353,38 +353,58 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <span className="font-mono text-white font-semibold">{formatFCFA(property.price)}</span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 text-gray-300">
-                  <span className="text-gray-400">Caution ({property.entryCost.cautionMois} mois) :</span>
-                  <span className="font-mono text-white font-semibold">{formatFCFA(property.price * property.entryCost.cautionMois)}</span>
+                  <span className="text-gray-400">
+                    Caution {property.entryCost.cautionMois !== null ? `(${property.entryCost.cautionMois} mois)` : ''} :
+                  </span>
+                  <span className="font-mono text-white font-semibold">
+                    {formatFCFAOrUnknown(
+                      property.entryCost.cautionMois !== null
+                        ? property.price * property.entryCost.cautionMois
+                        : null
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 text-gray-300">
-                  <span className="text-gray-400">Avance ({property.entryCost.avanceMois} mois) :</span>
-                  <span className="font-mono text-white font-semibold">{formatFCFA(property.price * property.entryCost.avanceMois)}</span>
+                  <span className="text-gray-400">
+                    Avance {property.entryCost.avanceMois !== null ? `(${property.entryCost.avanceMois} mois)` : ''} :
+                  </span>
+                  <span className="font-mono text-white font-semibold">
+                    {formatFCFAOrUnknown(
+                      property.entryCost.avanceMois !== null
+                        ? property.price * property.entryCost.avanceMois
+                        : null
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 text-gray-300">
                   <span className="text-gray-400">Frais d'agence :</span>
                   <span className="font-mono text-white font-semibold">
-                    {property.entryCost.fraisAgence > 0 ? formatFCFA(property.entryCost.fraisAgence) : '0 FCFA (Direct)'}
+                    {property.entryCost.fraisAgence === 0
+                      ? '0 FCFA (Direct)'
+                      : formatFCFAOrUnknown(property.entryCost.fraisAgence)}
                   </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 text-gray-300">
                   <span className="text-gray-400">Frais de dossier :</span>
-                  <span className="font-mono text-white font-semibold">{formatFCFA(property.entryCost.fraisDossier)}</span>
+                  <span className="font-mono text-white font-semibold">{formatFCFAOrUnknown(property.entryCost.fraisDossier)}</span>
                 </div>
                 
                 <div className="h-px bg-white/10 my-2"></div>
                 <div className="flex justify-between text-base font-bold items-center pt-1">
                   <span className="text-white text-xs tracking-wider uppercase font-bold">COÛT D'ENTRÉE</span>
-                  <span className="text-[#FF5A2D] text-lg font-black">{formatFCFA(property.entryCost.total)}</span>
+                  <span className="text-[#FF5A2D] text-lg font-black">{formatFCFAOrUnknown(property.entryCost.total)}</span>
                 </div>
               </div>
 
               {/* Budget Assessment Verdict */}
               <div className={`p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 border ${
-                budgetAssessment.isCompatible
-                  ? 'bg-[#4CAF50]/15 text-[#4CAF50] border-[#4CAF50]/30'
-                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                budgetAssessment.isCompatible === null
+                  ? 'bg-white/5 text-gray-300 border-white/10'
+                  : budgetAssessment.isCompatible
+                    ? 'bg-[#4CAF50]/15 text-[#4CAF50] border-[#4CAF50]/30'
+                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
               }`}>
-                <span>{budgetAssessment.isCompatible ? '✅' : '⚠️'}</span>
+                <span>{budgetAssessment.isCompatible === null ? 'ℹ️' : budgetAssessment.isCompatible ? '✅' : '⚠️'}</span>
                 <span>{budgetAssessment.message}</span>
               </div>
             </div>

@@ -34,14 +34,16 @@ const data = getDataSource();
 export interface AppShellProps {
   /** Rôle vérifié côté serveur — jamais fourni par le client. */
   canAccessAdmin: boolean;
+  /** Annonces publiées lues sous RLS côté serveur. */
+  initialProperties: Property[];
 }
 
-export default function AppShell({ canAccessAdmin }: AppShellProps) {
+export default function AppShell({ canAccessAdmin, initialProperties }: AppShellProps) {
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<AppTab>('swipe');
 
   // Core domain state
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<Property[]>(initialProperties);
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(DEFAULT_PREFS);
   const [swipedIds, setSwipedIds] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -69,7 +71,9 @@ export default function AppShell({ canAccessAdmin }: AppShellProps) {
 
   // Hydratation depuis la source de données (client uniquement)
   useEffect(() => {
-    void data.getProperties().then(setProperties);
+    if (initialProperties.length === 0) {
+      void data.getProperties().then(setProperties);
+    }
     setUserPreferences(data.getPreferences());
     setSwipedIds(data.getSwipes());
     setFavoriteIds(data.getFavorites());

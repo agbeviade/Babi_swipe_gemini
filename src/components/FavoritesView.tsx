@@ -16,7 +16,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Property, UserPreferences } from '@/types';
-import { formatFCFA } from '@/services/budgetService';
+import { formatFCFA, formatFCFAOrUnknown } from '@/services/budgetService';
 import { formatDistance } from '@/services/geoService';
 import { calculateBabiScore } from '@/services/babiScoreService';
 import { ComparatorModal } from '@/components/ComparatorModal';
@@ -173,7 +173,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
                     <div className="text-[10px] text-gray-400 mt-1">
                       Coût d'entrée :{' '}
                       <strong className="text-[#FF5A2D]">
-                        {formatFCFA(property.entryCost.total)}
+                        {formatFCFAOrUnknown(property.entryCost.total)}
                       </strong>
                     </div>
                   </div>

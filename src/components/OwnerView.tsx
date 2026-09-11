@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Property, VisitRequest, PropertyType, TransactionType } from '@/types';
 import { ABIDJAN_COMMUNES, PROPERTY_FEATURES_LIST } from '@/lib/constants';
-import { formatFCFA, calculateEntryCost } from '@/services/budgetService';
+import { formatFCFA, formatFCFAOrUnknown, buildEntryCost } from '@/services/budgetService';
 
 interface OwnerViewProps {
   ownerProperties: Property[];
@@ -58,6 +58,11 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
   const [imageUrl, setImageUrl] = useState(
     'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80'
   );
+  // Postes du coût d'entrée : vides tant que l'annonceur ne les déclare pas.
+  const [cautionMois, setCautionMois] = useState<string>('');
+  const [avanceMois, setAvanceMois] = useState<string>('');
+  const [fraisAgence, setFraisAgence] = useState<string>('');
+  const [fraisDossier, setFraisDossier] = useState<string>('');
   const [publishedSuccess, setPublishedSuccess] = useState(false);
 
   const toggleFeature = (id: string) => {
@@ -68,7 +73,15 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
     }
   };
 
-  const calculatedCost = calculateEntryCost(price, 2, 2, 1, 30000);
+  const toDeclared = (value: string): number | null => (value.trim() === '' ? null : Number(value));
+
+  const calculatedCost = buildEntryCost({
+    loyer: price,
+    cautionMois: toDeclared(cautionMois),
+    avanceMois: toDeclared(avanceMois),
+    fraisAgence: toDeclared(fraisAgence),
+    fraisDossier: toDeclared(fraisDossier)
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,12 +119,13 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
         phone: '+225 07 00 11 22',
         whatsapp: '22507001122',
         agencyName: 'BABI Immo Pro Partner',
-        isVerified: true,
-        verifications: ['phone_verified', 'id_verified', 'agency_verified'],
+        isVerified: false,
+        verifications: [],
         rating: 4.9,
         reviewCount: 14
       },
-      isVerified: true,
+      // Le badge « vérifié » est accordé par la modération, jamais par l'annonceur.
+      isVerified: false,
       isBoosted: false,
       isAvailable: true,
       availableFrom: 'Immédiatement',
@@ -405,17 +419,64 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 />
               </div>
 
-              {/* Babi Budget Auto calculated preview */}
+              {/* Coût d'entrée : uniquement ce que l'annonceur déclare */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-bold block mb-1.5 text-gray-300">Caution (mois)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Non renseigné"
+                    value={cautionMois}
+                    onChange={(e) => setCautionMois(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-white/10 bg-[#0F1115] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#FF5A2D]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold block mb-1.5 text-gray-300">Avance (mois)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Non renseigné"
+                    value={avanceMois}
+                    onChange={(e) => setAvanceMois(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-white/10 bg-[#0F1115] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#FF5A2D]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold block mb-1.5 text-gray-300">Frais d'agence (FCFA)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5000"
+                    placeholder="Non renseigné"
+                    value={fraisAgence}
+                    onChange={(e) => setFraisAgence(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-white/10 bg-[#0F1115] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#FF5A2D]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold block mb-1.5 text-gray-300">Frais de dossier (FCFA)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5000"
+                    placeholder="Non renseigné"
+                    value={fraisDossier}
+                    onChange={(e) => setFraisDossier(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-white/10 bg-[#0F1115] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#FF5A2D]"
+                  />
+                </div>
+              </div>
+
               <div className="p-3.5 rounded-2xl bg-[#FF5A2D]/10 border border-[#FF5A2D]/30 text-[11px] space-y-1">
-                <span className="font-bold text-[#FF5A2D] block">
-                  BABI BUDGET Automatique calculé :
-                </span>
+                <span className="font-bold text-[#FF5A2D] block">BABI BUDGET :</span>
                 <div className="text-gray-300">
                   Coût d'entrée pour le locataire :{' '}
-                  <strong className="text-white">
-                    {formatFCFA(calculatedCost.total)}
-                  </strong>{' '}
-                  (2 mois caution + 2 mois avance + 1 mois agence + dossier).
+                  <strong className="text-white">{formatFCFAOrUnknown(calculatedCost.total)}</strong>
+                  {calculatedCost.total === null
+                    ? " — déclarez la caution et l'avance pour l'afficher aux candidats."
+                    : ' (caution + avance + frais déclarés).'}
                 </div>
               </div>
 

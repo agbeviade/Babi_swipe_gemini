@@ -3,7 +3,7 @@
 import React from 'react';
 import { X, Sparkles, ShieldCheck, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Property, UserPreferences } from '@/types';
-import { formatFCFA } from '@/services/budgetService';
+import { formatFCFA, formatFCFAOrUnknown } from '@/services/budgetService';
 import { formatDistance } from '@/services/geoService';
 import { calculateBabiScore } from '@/services/babiScoreService';
 import { PROPERTY_FEATURES_LIST } from '@/lib/constants';
@@ -81,7 +81,7 @@ export const ComparatorModal: React.FC<ComparatorModalProps> = ({
                 </td>
                 {properties.map((p) => (
                   <td key={p.id} className="p-3 font-black text-[#FF5A2D] font-mono text-sm">
-                    {formatFCFA(p.entryCost.total)}
+                    {formatFCFAOrUnknown(p.entryCost.total)}
                     <span className="block text-[10px] text-gray-400 font-normal">
                       (Caution + Avance + Frais)
                     </span>
