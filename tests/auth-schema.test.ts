@@ -1,33 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { requestOtpSchema, verifyOtpSchema } from '@/schemas/auth';
+import { signInSchema, signUpSchema, verifyEmailOtpSchema } from '@/schemas/auth';
 
-describe('requestOtpSchema', () => {
-  it('normalise les séparateurs et accepte un numéro ivoirien', () => {
-    expect(requestOtpSchema.parse({ phone: '+225 07 01 02 03 04' }).phone).toBe('+2250701020304');
+describe('signInSchema', () => {
+  it("normalise l'adresse e-mail", () => {
+    expect(signInSchema.parse({ email: '  Test@Example.COM ', password: 'secret' }).email).toBe(
+      'test@example.com',
+    );
   });
 
-  it('rejette un numéro sans indicatif ou de mauvaise longueur', () => {
-    expect(requestOtpSchema.safeParse({ phone: '0701020304' }).success).toBe(false);
-    expect(requestOtpSchema.safeParse({ phone: '+225070102030' }).success).toBe(false);
+  it('rejette une adresse invalide ou un mot de passe vide', () => {
+    expect(signInSchema.safeParse({ email: 'pas-un-email', password: 'secret' }).success).toBe(
+      false,
+    );
+    expect(signInSchema.safeParse({ email: 'a@b.com', password: '' }).success).toBe(false);
   });
 });
 
-describe('verifyOtpSchema', () => {
+describe('signUpSchema', () => {
+  it('exige 8 caractères minimum', () => {
+    expect(signUpSchema.safeParse({ email: 'a@b.com', password: '1234567' }).success).toBe(false);
+    expect(signUpSchema.safeParse({ email: 'a@b.com', password: '12345678' }).success).toBe(true);
+  });
+});
+
+describe('verifyEmailOtpSchema', () => {
   it('exige un code à 6 chiffres', () => {
-    expect(
-      verifyOtpSchema.safeParse({ phone: '+2250701020304', token: '12345' }).success,
-    ).toBe(false);
-    expect(
-      verifyOtpSchema.safeParse({ phone: '+2250701020304', token: '123456' }).success,
-    ).toBe(true);
+    expect(verifyEmailOtpSchema.safeParse({ email: 'a@b.com', token: '12345' }).success).toBe(
+      false,
+    );
+    expect(verifyEmailOtpSchema.safeParse({ email: 'a@b.com', token: '123456' }).success).toBe(
+      true,
+    );
   });
 
-  it("refuse une redirection hors du site (open redirect)", () => {
+  it('refuse une redirection hors du site (open redirect)', () => {
     expect(
-      verifyOtpSchema.safeParse({
-        phone: '+2250701020304',
+      verifyEmailOtpSchema.safeParse({
+        email: 'a@b.com',
         token: '123456',
         next: 'https://evil.example/phish',
+      }).success,
+    ).toBe(false);
+    expect(
+      verifyEmailOtpSchema.safeParse({
+        email: 'a@b.com',
+        token: '123456',
+        next: '//evil.example/phish',
       }).success,
     ).toBe(false);
   });
