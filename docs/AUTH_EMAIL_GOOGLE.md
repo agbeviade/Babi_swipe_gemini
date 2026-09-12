@@ -9,6 +9,11 @@ L'authentification par SMS est abandonnée. Le code applique désormais :
 Trois réglages doivent être faits dans le tableau de bord Supabase ; sans eux, le code
 affiche une erreur explicite mais aucun e-mail ne part et Google est refusé.
 
+État du projet Supabase de production : SMTP Resend actif (expéditeur
+`no-reply@epicestock.com`), modèles « Confirm signup » et « Magic Link » avec
+`{{ .Token }}`, OTP à 6 chiffres valable 15 minutes, Google OAuth activé, provider
+Phone désactivé, Site URL et redirect URLs pointant sur le domaine Vercel.
+
 ## 1. SMTP Resend (l'e-mail part par Resend)
 
 Authentication → Emails → SMTP Settings → Enable custom SMTP :
