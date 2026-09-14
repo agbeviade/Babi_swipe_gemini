@@ -8,8 +8,10 @@ create policy users_self_select on public.users for select using (id = auth.uid(
 create policy users_self_update on public.users for update using (id = auth.uid()) with check (id = auth.uid());
 
 alter table public.personal_workspaces enable row level security;
-create policy personal_workspaces_owner on public.personal_workspaces
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy personal_workspaces_owner_select on public.personal_workspaces
+  for select using (user_id = auth.uid());
+create policy personal_workspaces_owner_update on public.personal_workspaces
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 alter table public.organizations enable row level security;
 create policy organizations_member_select on public.organizations

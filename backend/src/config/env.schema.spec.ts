@@ -32,4 +32,14 @@ describe('validateEnv', () => {
   it('rejects an unknown environment name', () => {
     expect(() => validateEnv({ ...validEnv, NODE_ENV: 'prod' })).toThrow(/NODE_ENV/);
   });
+
+  it('rejects wildcard CORS in production', () => {
+    expect(() => validateEnv({ ...validEnv, NODE_ENV: 'production' })).toThrow(/CORS_ORIGINS/);
+    const env = validateEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      CORS_ORIGINS: 'https://app.defactfacile.com',
+    });
+    expect(env.CORS_ORIGINS).toBe('https://app.defactfacile.com');
+  });
 });

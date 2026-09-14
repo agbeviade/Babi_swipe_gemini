@@ -36,6 +36,7 @@ npm run start:dev                  # http://localhost:3000/api/v1/health — Swa
 cd mobile/flutter_app
 flutter pub get
 flutter run --dart-define-from-file=env/development.json
+# Émulateur Android (localhost = l'émulateur) : env/development.android.json (10.0.2.2) ; appareil physique : remplacer par l'IP LAN du poste
 
 # Base de données (PostgreSQL local jetable)
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/defact_test \
@@ -59,7 +60,7 @@ Règles :
 - Le backend valide ses variables au démarrage (`backend/src/config/env.schema.ts`) et refuse de démarrer si une clé manque.
 - Le mobile ne reçoit que des valeurs publiques via `--dart-define-from-file` (`API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`).
   La clé `service_role`, Resend, Anthropic, OpenAI, FNE ne quittent jamais le backend.
-- `NODE_ENV=production` désactive Swagger et active les en-têtes de sécurité stricts.
+- `NODE_ENV=production` désactive Swagger, active les en-têtes de sécurité stricts et **refuse `CORS_ORIGINS=*`** (liste explicite obligatoire).
 
 ## Commandes de vérification
 

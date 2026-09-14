@@ -17,8 +17,8 @@ HEADER = "-- DEFACT FACILE migration: {name}\n-- {desc}\n\n"
 
 # Every business table is owned by exactly one workspace: either a personal
 # workspace or an organization. The check constraint enforces XOR.
-TENANT = """  personal_workspace_id uuid references public.personal_workspaces(id) on delete cascade,
-  organization_id uuid references public.organizations(id) on delete cascade,
+TENANT = """  personal_workspace_id uuid references public.personal_workspaces(id) on delete restrict,
+  organization_id uuid references public.organizations(id) on delete restrict,
   constraint {t}_single_tenant check (
     (personal_workspace_id is not null and organization_id is null) or
     (personal_workspace_id is null and organization_id is not null)
@@ -89,6 +89,22 @@ create table public.users (
 create trigger set_users_updated_at
   before update on public.users
   for each row execute function public.set_updated_at();
+
+-- Platform admin flag is only ever changed by trusted server code (service role).
+create or replace function public.protect_platform_admin_flag()
+returns trigger language plpgsql as $$
+begin
+  if new.is_platform_admin is distinct from old.is_platform_admin
+     and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'is_platform_admin can only be changed by the service role';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger users_protect_platform_admin
+  before update on public.users
+  for each row execute function public.protect_platform_admin_flag();
 
 -- Auto-provision the profile row when Supabase Auth creates an account.
 create or replace function public.handle_new_auth_user()
@@ -673,8 +689,8 @@ MIGRATIONS["028_deliveries.sql"] = tenant_table(
 MIGRATIONS["029_ai_credits.sql"] = HEADER.format(name="029_ai_credits", desc="AI credit balances per workspace + configurable action costs.") + """
 create table public.ai_credits (
   id uuid primary key default gen_random_uuid(),
-  personal_workspace_id uuid references public.personal_workspaces(id) on delete cascade,
-  organization_id uuid references public.organizations(id) on delete cascade,
+  personal_workspace_id uuid references public.personal_workspaces(id) on delete restrict,
+  organization_id uuid references public.organizations(id) on delete restrict,
   balance integer not null default 0 check (balance >= 0),
   monthly_allowance integer not null default 0,
   period_start date,
@@ -783,8 +799,8 @@ create trigger set_plans_updated_at
 MIGRATIONS["034_subscriptions.sql"] = HEADER.format(name="034_subscriptions", desc="Workspace subscription state.") + """
 create table public.subscriptions (
   id uuid primary key default gen_random_uuid(),
-  personal_workspace_id uuid references public.personal_workspaces(id) on delete cascade,
-  organization_id uuid references public.organizations(id) on delete cascade,
+  personal_workspace_id uuid references public.personal_workspaces(id) on delete restrict,
+  organization_id uuid references public.organizations(id) on delete restrict,
   plan_id uuid not null references public.plans(id) on delete restrict,
   status text not null default 'TRIALING' check (status in ('TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED')),
   billing_cycle text not null default 'MONTHLY' check (billing_cycle in ('MONTHLY', 'YEARLY')),
@@ -854,8 +870,10 @@ create policy users_self_select on public.users for select using (id = auth.uid(
 create policy users_self_update on public.users for update using (id = auth.uid()) with check (id = auth.uid());
 
 alter table public.personal_workspaces enable row level security;
-create policy personal_workspaces_owner on public.personal_workspaces
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy personal_workspaces_owner_select on public.personal_workspaces
+  for select using (user_id = auth.uid());
+create policy personal_workspaces_owner_update on public.personal_workspaces
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 alter table public.organizations enable row level security;
 create policy organizations_member_select on public.organizations

@@ -4,8 +4,8 @@
 
 create table public.subscriptions (
   id uuid primary key default gen_random_uuid(),
-  personal_workspace_id uuid references public.personal_workspaces(id) on delete cascade,
-  organization_id uuid references public.organizations(id) on delete cascade,
+  personal_workspace_id uuid references public.personal_workspaces(id) on delete restrict,
+  organization_id uuid references public.organizations(id) on delete restrict,
   plan_id uuid not null references public.plans(id) on delete restrict,
   status text not null default 'TRIALING' check (status in ('TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED')),
   billing_cycle text not null default 'MONTHLY' check (billing_cycle in ('MONTHLY', 'YEARLY')),

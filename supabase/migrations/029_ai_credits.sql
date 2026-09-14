@@ -4,8 +4,8 @@
 
 create table public.ai_credits (
   id uuid primary key default gen_random_uuid(),
-  personal_workspace_id uuid references public.personal_workspaces(id) on delete cascade,
-  organization_id uuid references public.organizations(id) on delete cascade,
+  personal_workspace_id uuid references public.personal_workspaces(id) on delete restrict,
+  organization_id uuid references public.organizations(id) on delete restrict,
   balance integer not null default 0 check (balance >= 0),
   monthly_allowance integer not null default 0,
   period_start date,
